@@ -7,6 +7,7 @@ import 'package:PiliPlus/http/video.dart';
 import 'package:PiliPlus/models/common/video/source_type.dart';
 import 'package:PiliPlus/models_new/fav/fav_folder/data.dart';
 import 'package:PiliPlus/models_new/video/video_detail/data.dart';
+import 'package:PiliPlus/models_new/video/video_detail/episode.dart';
 import 'package:PiliPlus/models_new/video/video_detail/stat_detail.dart';
 import 'package:PiliPlus/models_new/video/video_tag/data.dart';
 import 'package:PiliPlus/pages/video/controller.dart';
@@ -59,6 +60,7 @@ abstract class CommonIntroController extends GetxController
 
   bool prevPlay();
   bool nextPlay();
+  BaseEpisodeItem? peekNextEpisode();
 
   void actionShareVideo(BuildContext context);
 

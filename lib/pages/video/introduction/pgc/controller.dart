@@ -373,29 +373,31 @@ class PgcIntroController extends CommonIntroController {
   @override
   bool nextPlay() {
     try {
-      final episodes = pgcItem.episodes!;
-
-      PlayRepeat playRepeat = videoDetailCtr.plPlayerController.playRepeat;
-
-      int currentIndex = episodes.indexWhere(
-        (e) => e.cid == videoDetailCtr.cid.value,
-      );
-      int nextIndex = currentIndex + 1;
-      // 列表循环
-      if (nextIndex >= episodes.length) {
-        if (playRepeat == PlayRepeat.listCycle) {
-          nextIndex = 0;
-        } else if (playRepeat == PlayRepeat.autoPlayRelated) {
-          return false;
-        } else {
-          return false;
-        }
+      final nextEpisode = peekNextEpisode();
+      if (nextEpisode == null) {
+        return false;
       }
-      onChangeEpisode(episodes[nextIndex]);
+      onChangeEpisode(nextEpisode);
       return true;
     } catch (_) {
       return false;
     }
+  }
+
+  @override
+  BaseEpisodeItem? peekNextEpisode() {
+    final episodes = pgcItem.episodes!;
+    final playRepeat = videoDetailCtr.plPlayerController.playRepeat;
+    int nextIndex =
+        episodes.indexWhere((e) => e.cid == videoDetailCtr.cid.value) + 1;
+    if (nextIndex >= episodes.length) {
+      if (playRepeat == PlayRepeat.listCycle) {
+        nextIndex = 0;
+      } else {
+        return null;
+      }
+    }
+    return episodes[nextIndex];
   }
 
   // 一键三连

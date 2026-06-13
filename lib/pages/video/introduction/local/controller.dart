@@ -1,4 +1,5 @@
 import 'package:PiliPlus/models_new/download/bili_download_entry_info.dart';
+import 'package:PiliPlus/models_new/video/video_detail/episode.dart';
 import 'package:PiliPlus/models_new/video/video_detail/stat_detail.dart';
 import 'package:PiliPlus/pages/common/common_intro_controller.dart';
 import 'package:PiliPlus/pages/download/controller.dart';
@@ -112,6 +113,9 @@ class LocalIntroController extends CommonIntroController {
     }
     return false;
   }
+
+  @override
+  BaseEpisodeItem? peekNextEpisode() => null;
 
   @override
   bool prevPlay() {

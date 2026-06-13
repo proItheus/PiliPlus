@@ -634,30 +634,9 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
   @override
   bool nextPlay([bool skipPart = false]) {
     try {
-      final List<BaseEpisodeItem> episodes = <BaseEpisodeItem>[];
-      bool isPart = false;
-      final videoDetail = this.videoDetail.value;
-
-      // part -> playall -> season
-      if (!skipPart && (videoDetail.pages?.length ?? 0) > 1) {
-        isPart = true;
-        final List<Part> pages = videoDetail.pages!;
-        episodes.addAll(pages);
-      } else if (videoDetailCtr.isPlayAll) {
-        episodes.addAll(videoDetailCtr.mediaList);
-      } else if (videoDetail.ugcSeason != null) {
-        final UgcSeason ugcSeason = videoDetail.ugcSeason!;
-        final List<SectionItem> sections = ugcSeason.sections!;
-        for (int i = 0; i < sections.length; i++) {
-          final List<EpisodeItem> episodesList = sections[i].episodes!;
-          episodes.addAll(episodesList);
-        }
-      }
-
-      final PlayRepeat playRepeat =
-          videoDetailCtr.plPlayerController.playRepeat;
-
-      if (episodes.isEmpty) {
+      final nextEpisode = peekNextEpisode(skipPart);
+      if (nextEpisode == null) {
+        final playRepeat = videoDetailCtr.plPlayerController.playRepeat;
         if (playRepeat == PlayRepeat.listCycle) {
           videoDetailCtr.plPlayerController.play(repeat: true);
           return true;
@@ -668,60 +647,78 @@ class UgcIntroController extends CommonIntroController with ReloadMixin {
         }
         return false;
       }
-
-      final int currentIndex = episodes.indexWhere(
-        (e) =>
-            e.cid ==
-            (skipPart
-                ? videoDetail.isPageReversed
-                      ? videoDetail.pages!.last.cid
-                      : videoDetail.pages!.first.cid
-                : this.cid.value),
-      );
-
-      int nextIndex = currentIndex + 1;
-
-      if (!isPart &&
-          videoDetailCtr.isPlayAll &&
-          currentIndex == episodes.length - 2) {
-        videoDetailCtr.getMediaList();
-      }
-
-      // 列表循环
-      if (nextIndex >= episodes.length) {
-        if (isPart &&
-            (videoDetailCtr.isPlayAll || videoDetail.ugcSeason != null)) {
-          return nextPlay(true);
-        }
-
-        if (playRepeat == PlayRepeat.listCycle) {
-          nextIndex = 0;
-        } else if (playRepeat == PlayRepeat.autoPlayRelated &&
-            videoDetailCtr.plPlayerController.showRelatedVideo) {
-          return playRelated();
-        } else {
-          return false;
-        }
-      }
-
-      int? cid = episodes[nextIndex].cid;
-      while (cid == null) {
-        nextIndex++;
-        if (nextIndex >= episodes.length) {
-          return false;
-        }
-        cid = episodes[nextIndex].cid;
-      }
-
-      if (cid != this.cid.value) {
-        onChangeEpisode(episodes[nextIndex]);
-        return true;
-      } else {
-        return false;
-      }
+      onChangeEpisode(nextEpisode);
+      return true;
     } catch (_) {
       return false;
     }
+  }
+
+  @override
+  BaseEpisodeItem? peekNextEpisode([bool skipPart = false]) {
+    final List<BaseEpisodeItem> episodes = <BaseEpisodeItem>[];
+    bool isPart = false;
+    final videoDetail = this.videoDetail.value;
+
+    // part -> playall -> season
+    if (!skipPart && (videoDetail.pages?.length ?? 0) > 1) {
+      isPart = true;
+      episodes.addAll(videoDetail.pages!);
+    } else if (videoDetailCtr.isPlayAll) {
+      episodes.addAll(videoDetailCtr.mediaList);
+    } else if (videoDetail.ugcSeason != null) {
+      final UgcSeason ugcSeason = videoDetail.ugcSeason!;
+      final List<SectionItem> sections = ugcSeason.sections!;
+      for (int i = 0; i < sections.length; i++) {
+        episodes.addAll(sections[i].episodes!);
+      }
+    }
+
+    if (episodes.isEmpty) {
+      return null;
+    }
+
+    final int currentIndex = episodes.indexWhere(
+      (e) =>
+          e.cid ==
+          (skipPart
+              ? videoDetail.isPageReversed
+                    ? videoDetail.pages!.last.cid
+                    : videoDetail.pages!.first.cid
+              : cid.value),
+    );
+
+    int nextIndex = currentIndex + 1;
+
+    if (!isPart &&
+        videoDetailCtr.isPlayAll &&
+        currentIndex == episodes.length - 2) {
+      videoDetailCtr.getMediaList();
+    }
+
+    if (nextIndex >= episodes.length) {
+      if (isPart &&
+          (videoDetailCtr.isPlayAll || videoDetail.ugcSeason != null)) {
+        return peekNextEpisode(true);
+      }
+
+      if (videoDetailCtr.plPlayerController.playRepeat == PlayRepeat.listCycle) {
+        nextIndex = 0;
+      } else {
+        return null;
+      }
+    }
+
+    int? targetCid = episodes[nextIndex].cid;
+    while (targetCid == null) {
+      nextIndex++;
+      if (nextIndex >= episodes.length) {
+        return null;
+      }
+      targetCid = episodes[nextIndex].cid;
+    }
+
+    return targetCid != cid.value ? episodes[nextIndex] : null;
   }
 
   bool playRelated() {
