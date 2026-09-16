@@ -306,7 +306,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     final isUgc = ctr.isUgc;
     int? page;
     int? partDuration;
-    if (isUgc && videoDetail.pages case final pages?) {
+    if (videoDetail.pages case final pages? when isUgc) {
       for (final p in pages) {
         if (p.cid == cid) {
           page = p.page;
