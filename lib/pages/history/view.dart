@@ -167,6 +167,10 @@ class _HistoryPageState extends State<HistoryPage>
       PopupMenuButton(
         itemBuilder: (_) => [
           PopupMenuItem(
+            onTap: () => Get.toNamed('/localHistory'),
+            child: const Text('本地观看记录'),
+          ),
+          PopupMenuItem(
             onTap: () => _historyController.baseCtr.onPauseHistory(context),
             child: Text(
               !_historyController.baseCtr.pauseStatus.value

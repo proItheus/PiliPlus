@@ -19,6 +19,8 @@ import 'package:PiliPlus/common/widgets/sliver/video_header.dart';
 import 'package:PiliPlus/common/widgets/svg/play_icon.dart';
 import 'package:PiliPlus/models/common/episode_panel_type.dart';
 import 'package:PiliPlus/models_new/pgc/pgc_info_model/result.dart';
+import 'package:PiliPlus/models_new/history/history.dart';
+import 'package:PiliPlus/models_new/history/list.dart';
 import 'package:PiliPlus/models_new/video/video_detail/episode.dart' as ugc;
 import 'package:PiliPlus/models_new/video/video_detail/page.dart';
 import 'package:PiliPlus/models_new/video/video_detail/ugc_season.dart';
@@ -60,6 +62,7 @@ import 'package:PiliPlus/utils/android/bindings.g.dart';
 import 'package:PiliPlus/utils/extension/scroll_controller_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
 import 'package:PiliPlus/utils/image_utils.dart';
+import 'package:PiliPlus/utils/local_history.dart';
 import 'package:PiliPlus/utils/max_screen_size.dart';
 import 'package:PiliPlus/utils/mobile_observer.dart';
 import 'package:PiliPlus/utils/num_utils.dart';
@@ -212,6 +215,14 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   // 播放器状态监听
   Future<void> playerListener(PlayerStatus status) async {
     final isPlaying = status.isPlaying;
+    // 本地观看历史（本地文件不记录）
+    if (!videoDetailController.isFileSource) {
+      if (isPlaying) {
+        recordLocalHistory(completed: false);
+      } else if (status.isCompleted) {
+        recordLocalHistory(completed: true);
+      }
+    }
     try {
       if (videoDetailController.scrollCtr.hasClients) {
         if (isPlaying) {
@@ -283,6 +294,52 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         }
       }
     }
+  }
+
+  // 记录本地观看历史
+  void recordLocalHistory({required bool completed}) {
+    final ctr = videoDetailController;
+    final videoDetail = introController.videoDetail.value;
+    final title = videoDetail.title ?? ctr.args['title'] as String?;
+    if (title?.isNotEmpty != true) return;
+    final cid = ctr.cid.value;
+    final isUgc = ctr.isUgc;
+    int? page;
+    int? partDuration;
+    if (isUgc && videoDetail.pages case final pages?) {
+      for (final p in pages) {
+        if (p.cid == cid) {
+          page = p.page;
+          partDuration = p.duration;
+          break;
+        }
+      }
+    }
+    final positionMs = plPlayerController?.positionInMilliseconds ?? 0;
+    LocalHistory.record(
+      HistoryItemModel(
+        title: title,
+        cover: videoDetail.pic ?? ctr.cover.value,
+        uri: isUgc
+            ? 'https://www.bilibili.com/video/${ctr.bvid}'
+                  '${page != null && page > 1 ? '?p=$page' : ''}'
+            : null,
+        history: History(
+          oid: ctr.aid,
+          epid: ctr.epId,
+          bvid: ctr.bvid,
+          page: page,
+          cid: cid,
+          business: isUgc ? 'archive' : 'pgc',
+        ),
+        videos: (isUgc ? videoDetail.videos : 1) ?? 1,
+        authorName: videoDetail.owner?.name,
+        authorMid: videoDetail.owner?.mid,
+        viewAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        progress: completed ? -1 : (positionMs / 1000).round(),
+        duration: partDuration ?? videoDetail.duration,
+      ),
+    );
   }
 
   // 继续播放或重新播放
