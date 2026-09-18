@@ -17,6 +17,9 @@ abstract final class LocalHistory {
     return result;
   }
 
+  /// Completes when all currently queued local-history writes have finished.
+  static Future<void> flush() => _queue;
+
   /// 读取本地历史，按观看时间倒序。
   static List<HistoryItemModel> load() {
     final raw = GStorage.localHistory.get(_cacheKey);
