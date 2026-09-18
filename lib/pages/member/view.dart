@@ -332,9 +332,11 @@ class _MemberPageState extends State<MemberPage> {
     );
   }
 
-  List<Widget> _actions(ColorScheme theme) => [
-    if (_userController.reserves?.isNotEmpty ?? false)
-      _reserveBtn(_userController.reserves!, theme),
+  List<Widget> _actions(ColorScheme theme) {
+    final localSubscribed = _userController.localSubscribed.value;
+    return [
+      if (_userController.reserves?.isNotEmpty ?? false)
+        _reserveBtn(_userController.reserves!, theme),
     IconButton(
       tooltip: '搜索',
       onPressed: () => Get.toNamed(
@@ -345,6 +347,22 @@ class _MemberPageState extends State<MemberPage> {
     PopupMenuButton(
       icon: const Icon(Icons.more_vert),
       itemBuilder: (_) => <PopupMenuEntry>[
+        PopupMenuItem(
+          onTap: _userController.toggleLocalSubscription,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                localSubscribed
+                    ? Icons.remove_circle_outline
+                    : Icons.add_circle_outline,
+                size: 19,
+              ),
+              const SizedBox(width: 10),
+              Text(localSubscribed ? '移除本地订阅' : '加入本地订阅'),
+            ],
+          ),
+        ),
         if (_userController.account.isLogin &&
             _userController.account.mid != _mid) ...[
           PopupMenuItem(
@@ -568,7 +586,8 @@ class _MemberPageState extends State<MemberPage> {
       ],
     ),
     const SizedBox(width: 4),
-  ];
+    ];
+  }
 
   Widget get _buildBody => tabBarView(
     hitTestBehavior: .translucent,

@@ -19,6 +19,7 @@ abstract final class GStorage {
   static late final Box<UserInfoData> userInfo;
   static late final Box<dynamic> historyWord;
   static late final Box<dynamic> localHistory;
+  static late final Box<dynamic> localSubscriptions;
   static late final Box<dynamic> localCache;
   static late final Box<dynamic> setting;
   static late final Box<dynamic> video;
@@ -60,6 +61,13 @@ abstract final class GStorage {
           return deletedEntries > 4;
         },
       ).then((res) => localHistory = res),
+      // 本地订阅
+      Hive.openBox(
+        'localSubscriptions',
+        compactionStrategy: (int entries, int deletedEntries) {
+          return deletedEntries > 4;
+        },
+      ).then((res) => localSubscriptions = res),
       // 视频设置
       Hive.openBox('video').then((res) => video = res),
       Accounts.init(),
@@ -121,6 +129,7 @@ abstract final class GStorage {
       userInfo.compact(),
       historyWord.compact(),
       localHistory.compact(),
+      localSubscriptions.compact(),
       localCache.compact(),
       setting.compact(),
       video.compact(),
@@ -135,6 +144,7 @@ abstract final class GStorage {
       userInfo.close(),
       historyWord.close(),
       localHistory.close(),
+      localSubscriptions.close(),
       localCache.close(),
       setting.close(),
       video.close(),
@@ -149,6 +159,7 @@ abstract final class GStorage {
       userInfo.clear(),
       historyWord.clear(),
       localHistory.clear(),
+      localSubscriptions.clear(),
       localCache.clear(),
       setting.clear(),
       video.clear(),

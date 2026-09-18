@@ -29,6 +29,7 @@ import 'package:PiliPlus/pages/later_search/view.dart';
 import 'package:PiliPlus/pages/live_dm_block/view.dart';
 import 'package:PiliPlus/pages/live_room/view.dart';
 import 'package:PiliPlus/pages/local_history/view.dart';
+import 'package:PiliPlus/pages/local_subscription/view.dart';
 import 'package:PiliPlus/pages/login/view.dart';
 import 'package:PiliPlus/pages/main/view.dart';
 import 'package:PiliPlus/pages/main_reply/view.dart';
@@ -94,6 +95,11 @@ class Routes {
     GetPage(name: '/history', page: () => const HistoryPage()),
     // 本地观看历史
     GetPage(name: '/localHistory', page: () => const LocalHistoryPage()),
+    // 本地订阅
+    GetPage(
+      name: '/localSubscription',
+      page: () => const LocalSubscriptionPage(),
+    ),
     // 搜索页面
     GetPage(name: '/search', page: () => const SearchPage()),
     // 搜索结果

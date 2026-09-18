@@ -15,6 +15,7 @@ import 'package:PiliPlus/models_new/space/space/tab2.dart';
 import 'package:PiliPlus/pages/common/common_data_controller.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/extension/nested_scroll_ext.dart';
+import 'package:PiliPlus/utils/local_subscriptions.dart';
 import 'package:PiliPlus/utils/request_utils.dart';
 import 'package:PiliPlus/utils/share_utils.dart';
 import 'package:PiliPlus/utils/storage_pref.dart';
@@ -30,7 +31,9 @@ class MemberController extends CommonDataController<SpaceData, SpaceData?>
   int mid;
   String? username;
   String? userAvatar;
+  String? userSign;
 
+  final RxBool localSubscribed = false.obs;
   late final account = Accounts.main;
 
   Live? live;
@@ -67,6 +70,7 @@ class MemberController extends CommonDataController<SpaceData, SpaceData?>
 
   @override
   void onInit() {
+    localSubscribed.value = LocalSubscriptions.contains(mid);
     super.onInit();
     queryData();
   }
@@ -77,6 +81,7 @@ class MemberController extends CommonDataController<SpaceData, SpaceData?>
     final card = data.card;
     username = card?.name ?? '';
     userAvatar = card?.face;
+    userSign = card?.sign;
 
     isFollowed = card?.relation?.isFollowed;
 
@@ -171,6 +176,17 @@ class MemberController extends CommonDataController<SpaceData, SpaceData?>
     username = errMsg;
     loadingState.value = const Success(null);
     return true;
+  }
+  Future<void> toggleLocalSubscription() async {
+    final subscribed = await LocalSubscriptions.toggle(
+      mid: mid,
+      name: username,
+      face: userAvatar,
+      sign: userSign,
+    );
+    if (isClosed) return;
+    localSubscribed.value = subscribed;
+    SmartDialog.showToast(subscribed ? '已加入本地订阅' : '已移除本地订阅');
   }
 
   @override

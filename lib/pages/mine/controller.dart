@@ -64,6 +64,11 @@ class MineController extends CommonDataController<FavFolderData, FavFolderData>
       },
     ),
     (
+      icon: Icons.bookmark_border,
+      title: '本地订阅',
+      onTap: () => Get.toNamed('/localSubscription'),
+    ),
+    (
       icon: CustomIcons.watch_later_outlined,
       title: '稍后再看',
       onTap: () {
