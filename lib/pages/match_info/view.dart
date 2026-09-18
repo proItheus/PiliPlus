@@ -117,7 +117,8 @@ class _MatchInfoPageState extends CommonDynPageState<MatchInfoPage> {
                                 : '${response.homeScore} : ${response.awayScore}',
                             style: const TextStyle(
                               fontSize: 25,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: .bold,
+                              letterSpacing: 1.5,
                             ),
                           )
                         else if (response.season?.logo != null)
@@ -185,7 +186,7 @@ class _MatchInfoPageState extends CommonDynPageState<MatchInfoPage> {
   }
 
   @override
-  void replyReply(ReplyInfo replyItem, int? id) {
+  void replyReply(BuildContext context, ReplyInfo replyItem, int? id) {
     EasyThrottle.throttle('replyReply', const Duration(milliseconds: 500), () {
       int oid = replyItem.oid.toInt();
       int rpid = replyItem.id.toInt();

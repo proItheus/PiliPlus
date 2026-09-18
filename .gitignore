@@ -150,3 +150,6 @@ pili_release.json
 dist
 
 test*
+
+# nix/direnv related
+.direnv/

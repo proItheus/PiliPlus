@@ -1,0 +1,18 @@
+{"file":".trellis/tasks/00-bootstrap-guidelines/prd.md","reason":"Review requirements and acceptance criteria against final specs."}
+{"file":".trellis/tasks/00-bootstrap-guidelines/design.md","reason":"Review architecture boundaries and claims for source grounding."}
+{"file":".trellis/tasks/00-bootstrap-guidelines/implement.md","reason":"Review execution and validation coverage."}
+{"file":".trellis/tasks/00-bootstrap-guidelines/research/","type":"directory","reason":"Review repository evidence captured during analysis."}
+{"file":".trellis/spec/backend/index.md","reason":"Check backend checklist, links, and quality gates."}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Check integration paths and generated-code boundaries."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Check Hive persistence facts, key ownership, and no remote database claim."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Check typed HTTP/gRPC errors and presentation handoff."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Check logger/Catcher behavior and secret-safe diagnostics."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Check analyzer, async/resource, generated-code, and test guidance."}
+{"file":".trellis/spec/frontend/index.md","reason":"Check frontend checklist, links, and quality gates."}
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Check Flutter feature and shared-layer organization."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Check typed widget composition, theme, accessibility, and disposal."}
+{"file":".trellis/spec/frontend/hook-guidelines.md","reason":"Check actual Flutter/GetX lifecycle and absence of hook prescriptions."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Check GetX Rx/Obx, tags, loading, and pagination contracts."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Check null safety, model parsing, and generated boundaries."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check Flutter lint, lifecycle, state transition, and UI review guidance."}
+{"file":".trellis/spec/guides/index.md","reason":"Check shared thinking-guide routing remains intact."}
