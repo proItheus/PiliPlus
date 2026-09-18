@@ -1,8 +1,9 @@
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, Directory;
 import 'dart:math' show max;
 
 import 'package:PiliPlus/common/widgets/custom_icon.dart';
 import 'package:PiliPlus/common/widgets/dialog/simple_dialog_option.dart';
+import 'package:PiliPlus/common/widgets/emote_tooltip.dart';
 import 'package:PiliPlus/common/widgets/flutter/refresh_indicator.dart'
     show RefreshIndicator, displacement, refreshDragExtent;
 import 'package:PiliPlus/common/widgets/gesture/horizontal_drag_gesture_recognizer.dart'
@@ -28,7 +29,6 @@ import 'package:PiliPlus/pages/setting/models/model.dart';
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/pages/setting/widgets/slider_dialog.dart';
 import 'package:PiliPlus/pages/video/reply/widgets/reply_item_grpc.dart';
-import 'package:PiliPlus/plugin/pl_player/controller.dart';
 import 'package:PiliPlus/services/download/download_service.dart';
 import 'package:PiliPlus/utils/accounts.dart';
 import 'package:PiliPlus/utils/android/bindings.g.dart';
@@ -338,6 +338,13 @@ List<SettingsModel> get extraSettings => [
     setKey: SettingBoxKey.showDecorate,
     defaultVal: true,
     onChanged: (value) => PendantAvatar.showDecorate = value,
+  ),
+  SwitchModel(
+    title: '点击表情显示 Tooltip',
+    leading: const Icon(Icons.emoji_emotions_outlined),
+    setKey: SettingBoxKey.enableEmoteTooltip,
+    defaultVal: false,
+    onChanged: (value) => enableEmoteTooltip = value,
   ),
   SwitchModel(
     title: '显示粉丝勋章',
@@ -710,7 +717,7 @@ Future<void> audioNormalization(
                 Get.back();
                 GStorage.setting.put(key, param);
                 if (!fallback &&
-                    PlPlayerController.loudnormRegExp.hasMatch(param)) {
+                    AudioNormalization.loudnormRegExp.hasMatch(param)) {
                   audioNormalization(context, setState, fallback: true);
                 }
                 setState();
@@ -740,6 +747,13 @@ void _showDownPathDialog(BuildContext context, VoidCallback setState) {
         DialogOption(
           onPressed: () {
             Get.back();
+            PathUtils.openDir(downloadPath);
+          },
+          child: const Text('打开'),
+        ),
+        DialogOption(
+          onPressed: () {
+            Get.back();
             Utils.copyText(downloadPath);
           },
           child: const Text('复制', style: TextStyle(fontSize: 14)),
@@ -759,7 +773,11 @@ void _showDownPathDialog(BuildContext context, VoidCallback setState) {
         DialogOption(
           onPressed: () async {
             Get.back();
-            final path = await FilePicker.getDirectoryPath();
+            final path = await FilePicker.getDirectoryPath(
+              initialDirectory: Directory(downloadPath).existsSync()
+                  ? downloadPath
+                  : null,
+            );
             if (path == null || path == downloadPath) return;
             downloadPath = path;
             setState();

@@ -88,7 +88,7 @@ class _SavePanelState extends State<SavePanel> {
     if (_item case final ReplyInfo i) {
       _parseReply(i);
     } else if (_item case final DynamicItemModel i) {
-      _parseDyn(i);
+      uri = _parseDyn(i);
       if (kDebugMode) debugPrint(uri);
     }
   }
@@ -301,7 +301,7 @@ class _SavePanelState extends State<SavePanel> {
       image.dispose();
       final pngBytes = byteData!.buffer.asUint8List();
       final picName =
-          "${Constants.appName}_${itemType}_${DateFormat('yyyyMMddHHmmss').format(DateTime.now())}";
+          "${Constants.appName}_${itemType}_${DateFormatUtils.only0_9.format(DateTime.now())}";
       if (isShare) {
         Get.back();
         SmartDialog.dismiss();

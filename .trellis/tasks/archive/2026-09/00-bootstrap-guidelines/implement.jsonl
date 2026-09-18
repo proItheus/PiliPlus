@@ -1,0 +1,18 @@
+{"file":".trellis/tasks/00-bootstrap-guidelines/prd.md","reason":"Final requirements and acceptance criteria for the bootstrap task."}
+{"file":".trellis/tasks/00-bootstrap-guidelines/design.md","reason":"Architecture boundaries and source-backed guideline mapping."}
+{"file":".trellis/tasks/00-bootstrap-guidelines/implement.md","reason":"Ordered implementation and verification plan."}
+{"file":".trellis/tasks/00-bootstrap-guidelines/research/","type":"directory","reason":"Repository findings supporting the documented conventions."}
+{"file":".trellis/spec/backend/index.md","reason":"Backend integration checklist and guide routing."}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"HTTP/gRPC/TCP/services/utils locations and generated boundaries."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Hive CE local persistence, GStorage/Pref ownership, and no server database."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Request/GrpcReq envelopes, LoadingState, parsing, and user reporting."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Logger, Catcher JSON reports, levels, serialization, and secret safety."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Analyzer, async/resource, generated-code, and integration review checks."}
+{"file":".trellis/spec/frontend/index.md","reason":"Flutter/GetX checklist and guide routing."}
+{"file":".trellis/spec/frontend/directory-structure.md","reason":"Feature pages, shared widgets, routes, models, services, and platform boundaries."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Typed Flutter composition, theme, accessibility, and resource ownership."}
+{"file":".trellis/spec/frontend/hook-guidelines.md","reason":"Actual StatefulWidget/GetX lifecycle; no React or Flutter hooks."}
+{"file":".trellis/spec/frontend/state-management.md","reason":"GetX controllers, Rx/Obx, tagging, loading, refresh, and pagination."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Dart null safety, typed loading, JSON/Hive/protobuf model boundaries."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Flutter lints, lifecycle/resource checks, state transitions, and UI review."}
+{"file":".trellis/spec/guides/index.md","reason":"Shared thinking-guide routing required for cross-layer and reuse decisions."}
