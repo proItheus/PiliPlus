@@ -38,3 +38,25 @@ Replaced generic Trellis templates with source-backed Flutter/GetX integration, 
 ### Status
 
 [OK] **Completed**
+
+
+## Session 2: Add Nix-managed development workflow
+<!-- trellis-session: v=2 fp=b7c30bf4fe7cda9f -->
+
+**Date**: 2026-09-19
+**Task**: Add Nix-managed development workflow
+**Branch**: `local-subs`
+
+### Summary
+
+Added a Nix shell exposing just and fvm, direnv integration, FVM-backed Just recipes, and agent-facing workflow guidance. Verified Nix evaluation, tool resolution, Just formatting/listing, all recipe dry-runs, whitespace, and Trellis context validation.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d6927dc70` | chore(task): archive nix-dev-workflow |
+
+### Status
+
+[OK] **Completed**
