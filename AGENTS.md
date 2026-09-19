@@ -19,3 +19,7 @@ If you're using Codex or another agent-capable tool, additional project-scoped h
 Managed by Trellis. Edits outside this block are preserved; edits inside may be overwritten by a future `trellis update`.
 
 <!-- TRELLIS:END -->
+
+## Development workflow
+
+Before changing code or running project commands, read [the development workflow guide](.trellis/spec/guides/development-workflow.md). Enter the Nix environment with direnv or `nix-shell`, then use the documented `just` recipes; Flutter and Dart commands run through FVM.
