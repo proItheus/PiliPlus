@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Check queued Hive persistence and read-modify-write ordering."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Check awaited async writes and storage lifecycle handling."}
+{"file":".trellis/spec/frontend/hook-guidelines.md","reason":"Check State lifecycle snapshots and listener disposal."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check observable behavior and resource cleanup."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Check complete player-position-to-history data flow."}

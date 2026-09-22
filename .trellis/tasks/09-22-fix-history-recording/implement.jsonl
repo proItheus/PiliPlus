@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Serialized Hive read-modify-write and durable local-history queue contract."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Async storage writes, resource ownership, and observable persistence verification."}
+{"file":".trellis/spec/frontend/hook-guidelines.md","reason":"Flutter State lifecycle and listener cleanup requirements for playback callbacks."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Lifecycle-sensitive UI verification and no-leaked-listener review."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Player-to-storage-to-reader data-flow boundary review."}

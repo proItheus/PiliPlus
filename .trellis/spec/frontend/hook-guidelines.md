@@ -14,6 +14,14 @@ A page controller extends `GetxController` directly or a common controller base.
 
 Use `onInit` for initial state setup and first query, `onClose` for controller-owned cleanup, and `dispose` for Flutter `State` resources. Choose the owner deliberately: a widget-local animation/listener follows `State`, while page data, pagination, and `Rx` values follow the GetX controller.
 
+## Playback history lifecycle
+
+`VideoDetailPageV` owns the player listeners and the current non-file history snapshot. Status `playing` starts a history item; position callbacks checkpoint only while `_historyPlaying` is true and use a bounded interval; pause, completion, app pause, route push, and disposal force a snapshot. A completion snapshot is awaited before the existing automatic next-play branch runs.
+
+When a media source changes, compare the constructed `business|oid|cid` key with the last persisted item. Drop a stale position callback for a mismatched key; a non-start boundary persists the previous item; the next `playing` callback persists the previous item before recording the new key. This prevents an asynchronous pause/source-ID update from writing the old position into the new item.
+
+The local-history controller owns the read boundary: initialize its reactive list empty, await `LocalHistory.flush()` in `onInit`, and load only if the controller remains open. File-source playback continues through its existing `watchProgress` path and must not enter this history branch.
+
 ## Avoid and common mistakes
 
 - Do not import or recommend `flutter_hooks`, React `useState`, `useEffect`, or custom hook conventions; they are absent from `pubspec.yaml` and source.
@@ -21,3 +29,5 @@ Use `onInit` for initial state setup and first query, `onClose` for controller-o
 - Do not dispose a GetX controller's resources from an unrelated widget, or leave a `State`-owned listener alive after unmounting.
 - Do not register parameterized controllers without the existing tag strategy when multiple route instances can coexist.
 - Do not assume `onInit` is a substitute for awaiting asynchronous prerequisites; storage/network initialization still follows `main.dart` startup ordering.
+- Do not use the initial `playing` position as the only progress snapshot; ordinary position updates and explicit stop boundaries carry the actual progress.
+- Do not let position callbacks continue writing after pause/completion/route disposal, or let a mismatched source key overwrite the prior item's final snapshot.

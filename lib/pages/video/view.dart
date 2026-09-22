@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:io' show Platform;
 import 'dart:math';
 
@@ -119,6 +120,13 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       videoDetailController.plPlayerController.pipNoDanmaku;
 
   bool isShowing = true;
+  static const Duration _historyCheckpointInterval = Duration(seconds: 10);
+  String? _lastHistoryKey;
+  int? _lastHistoryProgress;
+  HistoryItemModel? _lastHistoryItem;
+  bool _historyStarted = false;
+  bool _historyPlaying = false;
+  bool _historyCompleted = false;
 
   bool get isFullScreen =>
       videoDetailController.plPlayerController.isFullScreen.value;
@@ -187,6 +195,14 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
   void positionListener(Duration position) {
     videoDetailController.playedTime = position;
+    if (!videoDetailController.isFileSource &&
+        _historyStarted &&
+        _historyPlaying &&
+        !_historyCompleted) {
+      unawaited(
+        recordLocalHistory(position: position, stalePosition: true),
+      );
+    }
   }
 
   @override
@@ -194,6 +210,11 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     final isResume = state == .resumed;
     final ctr = videoDetailController.plPlayerController..visible = isResume;
     if (isResume) {
+      _historyPlaying =
+          !videoDetailController.isFileSource &&
+          _historyStarted &&
+          !_historyCompleted &&
+          ctr.playerStatus.isPlaying;
       if (!ctr.showDanmaku) {
         introController.startTimer();
         ctr.showDanmaku = true;
@@ -201,6 +222,17 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
     } else if (state == .paused) {
       introController.cancelTimer();
       ctr.showDanmaku = false;
+      if (!videoDetailController.isFileSource && _historyStarted) {
+        _historyPlaying = false;
+        unawaited(
+          recordLocalHistory(
+            completed:
+                _historyCompleted ||
+                plPlayerController?.playerStatus.isCompleted == true,
+            force: true,
+          ),
+        );
+      }
     }
   }
 
@@ -216,14 +248,26 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   // 播放器状态监听
   Future<void> playerListener(PlayerStatus status) async {
     final isPlaying = status.isPlaying;
-    // 本地观看历史（本地文件不记录）
     if (!videoDetailController.isFileSource) {
       if (isPlaying) {
-        recordLocalHistory(completed: false);
+        _historyStarted = true;
+        _historyPlaying = true;
+        _historyCompleted = false;
+        await recordLocalHistory(force: true, sourceStarted: true);
       } else if (status.isCompleted) {
-        recordLocalHistory(completed: true);
+        _historyStarted = true;
+        _historyPlaying = false;
+        _historyCompleted = true;
+        await recordLocalHistory(completed: true, force: true);
+      } else if (_historyStarted) {
+        _historyPlaying = false;
+        await recordLocalHistory(
+          completed: _historyCompleted,
+          force: true,
+        );
       }
     }
+
     try {
       if (videoDetailController.scrollCtr.hasClients) {
         if (isPlaying) {
@@ -298,27 +342,37 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
   }
 
   // 记录本地观看历史
-  void recordLocalHistory({required bool completed}) {
-    final ctr = videoDetailController;
-    final videoDetail = introController.videoDetail.value;
-    final title = videoDetail.title ?? ctr.args['title'] as String?;
-    if (title?.isNotEmpty != true) return;
-    final cid = ctr.cid.value;
-    final isUgc = ctr.isUgc;
-    int? page;
-    int? partDuration;
-    if (videoDetail.pages case final pages? when isUgc) {
-      for (final p in pages) {
-        if (p.cid == cid) {
-          page = p.page;
-          partDuration = p.duration;
-          break;
+  Future<void> recordLocalHistory({
+    bool completed = false,
+    Duration? position,
+    bool force = false,
+    bool sourceStarted = false,
+    bool stalePosition = false,
+  }) async {
+    try {
+      final ctr = videoDetailController;
+      final videoDetail = introController.videoDetail.value;
+      final title = videoDetail.title ?? ctr.args['title'] as String?;
+      if (title?.isNotEmpty != true) return;
+      final cid = ctr.cid.value;
+      final isUgc = ctr.isUgc;
+      int? page;
+      int? partDuration;
+      if (videoDetail.pages case final pages? when isUgc) {
+        for (final p in pages) {
+          if (p.cid == cid) {
+            page = p.page;
+            partDuration = p.duration;
+            break;
+          }
         }
       }
-    }
-    final positionMs = plPlayerController?.positionInMilliseconds ?? 0;
-    LocalHistory.record(
-      HistoryItemModel(
+      final positionMs =
+          position?.inMilliseconds ??
+          plPlayerController?.positionInMilliseconds ??
+          0;
+      final progress = completed ? -1 : (positionMs / 1000).round();
+      final item = HistoryItemModel(
         title: title,
         cover: videoDetail.pic ?? ctr.cover.value,
         uri: isUgc
@@ -337,10 +391,43 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         authorName: videoDetail.owner?.name,
         authorMid: videoDetail.owner?.mid,
         viewAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
-        progress: completed ? -1 : (positionMs / 1000).round(),
+        progress: progress,
         duration: partDuration ?? videoDetail.duration,
-      ),
-    );
+      );
+      final key = LocalHistory.keyOf(item);
+      if (key != _lastHistoryKey && _lastHistoryKey != null) {
+        _historyPlaying = false;
+        if (stalePosition) return;
+        final previous = _lastHistoryItem;
+        if (!sourceStarted) {
+          if (previous != null) {
+            previous.viewAt = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+            await LocalHistory.record(previous);
+          }
+          return;
+        }
+        if (previous != null) {
+          previous.viewAt = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+          await LocalHistory.record(previous);
+        }
+        _historyPlaying = true;
+      }
+      _lastHistoryItem = item;
+      if (!force &&
+          key == _lastHistoryKey &&
+          progress >= 0 &&
+          _lastHistoryProgress != null &&
+          _lastHistoryProgress! >= 0 &&
+          (progress - _lastHistoryProgress!).abs() <
+              _historyCheckpointInterval.inSeconds) {
+        return;
+      }
+      _lastHistoryKey = key;
+      _lastHistoryProgress = progress;
+      await LocalHistory.record(item);
+    } catch (error) {
+      if (kDebugMode) debugPrint('record local history: $error');
+    }
   }
 
   // 继续播放或重新播放
@@ -385,10 +472,21 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
 
   @override
   void dispose() {
+    if (!videoDetailController.isFileSource && _historyStarted) {
+      _historyPlaying = false;
+      unawaited(
+        recordLocalHistory(
+          completed:
+              _historyCompleted ||
+              plPlayerController?.playerStatus.isCompleted == true,
+          force: true,
+        ),
+      );
+    }
+
     plPlayerController
       ?..removeStatusLister(playerListener)
       ..removePositionListener(positionListener);
-
     Get.delete<HorizontalMemberPageController>(
       tag: videoDetailController.heroTag,
     );
@@ -440,6 +538,17 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       ..cancelBlockListener()
       ..playerStatus = plPlayerController?.playerStatus
       ..brightness = plPlayerController?.brightness.value;
+    if (!videoDetailController.isFileSource && _historyStarted) {
+      _historyPlaying = false;
+      unawaited(
+        recordLocalHistory(
+          completed:
+              _historyCompleted ||
+              plPlayerController?.playerStatus.isCompleted == true,
+          force: true,
+        ),
+      );
+    }
     if (plPlayerController != null) {
       videoDetailController.makeHeartBeat();
       plPlayerController!
