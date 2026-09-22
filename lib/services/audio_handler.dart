@@ -81,14 +81,18 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
     if (!mediaItem.isClosed) mediaItem.add(newMediaItem);
   }
 
-  void setPlaybackState(
+  Duration? _lastPos;
+  _StatusConfig? _lastConfig;
+
+  void onUpdateState(
     PlayerStatus status,
     bool isBuffering,
-    bool isLive,
-  ) {
-    if (!enableBackgroundPlay ||
-        _item.isEmpty ||
-        !PlPlayerController.instanceExists()) {
+    bool isLive, {
+    required Duration position,
+    required double speed,
+    String? debugLabel,
+  }) {
+    if (!enableBackgroundPlay || _item.isEmpty) {
       return;
     }
 
