@@ -18,6 +18,7 @@ import 'package:path/path.dart' as path;
 abstract final class GStorage {
   static late final Box<UserInfoData> userInfo;
   static late final Box<dynamic> historyWord;
+  static late final Box<dynamic> localHistory;
   static late final Box<dynamic> localCache;
   static late final Box<dynamic> setting;
   static late final Box<dynamic> video;
@@ -52,6 +53,13 @@ abstract final class GStorage {
           return deletedEntries > 10;
         },
       ).then((res) => historyWord = res),
+      // 本地观看历史
+      Hive.openBox(
+        'localHistory',
+        compactionStrategy: (int entries, int deletedEntries) {
+          return deletedEntries > 4;
+        },
+      ).then((res) => localHistory = res),
       // 视频设置
       Hive.openBox('video').then((res) => video = res),
       Accounts.init(),
@@ -112,6 +120,7 @@ abstract final class GStorage {
     return Future.wait([
       userInfo.compact(),
       historyWord.compact(),
+      localHistory.compact(),
       localCache.compact(),
       setting.compact(),
       video.compact(),
@@ -125,6 +134,7 @@ abstract final class GStorage {
     return Future.wait([
       userInfo.close(),
       historyWord.close(),
+      localHistory.close(),
       localCache.close(),
       setting.close(),
       video.close(),
@@ -138,6 +148,7 @@ abstract final class GStorage {
     return Future.wait([
       userInfo.clear(),
       historyWord.clear(),
+      localHistory.clear(),
       localCache.clear(),
       setting.clear(),
       video.clear(),

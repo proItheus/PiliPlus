@@ -83,6 +83,7 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
 
   Duration? _lastPos;
   _StatusConfig? _lastConfig;
+
   void onUpdateState(
     PlayerStatus status,
     bool isBuffering,
@@ -169,7 +170,9 @@ class VideoPlayerServiceHandler extends BaseAudioHandler with SeekHandler {
             ),
         ],
         playing: playing,
-        systemActions: const {.seek},
+        systemActions: const {
+          MediaAction.seek,
+        },
       ),
     );
     if (Platform.isAndroid &&

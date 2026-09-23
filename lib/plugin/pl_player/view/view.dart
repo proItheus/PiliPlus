@@ -130,7 +130,7 @@ class PLVideoPlayer extends StatefulWidget {
 class _PLVideoPlayerState extends State<PLVideoPlayer>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   late AnimationController _animationController;
-  late VideoController videoController;
+  VideoController? videoController;
   late final CommonIntroController introController = widget.introController!;
   late final VideoDetailController videoDetailController =
       widget.videoDetailController!;
@@ -152,6 +152,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
   bool _pauseDueToPauseUponEnteringBackgroundMode = false;
 
   StreamSubscription? _brightnessListener;
+  StreamSubscription? _dataStatusListener;
   void _onBrightnessChanged(double value) {
     if (mounted && _gestureType != .left) {
       _brightnessValue.value = value;
@@ -264,7 +265,17 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
       vsync: this,
       duration: const Duration(milliseconds: 100),
     );
-    videoController = plPlayerController.videoController!;
+    videoController = plPlayerController.videoController;
+    if (videoController == null) {
+      _dataStatusListener = plPlayerController.dataStatus.listen((status) {
+        if (!mounted || status != DataStatus.loaded) return;
+        final controller = plPlayerController.videoController;
+        if (controller == null) return;
+        _dataStatusListener?.cancel();
+        _dataStatusListener = null;
+        setState(() => videoController = controller);
+      });
+    }
 
     if (PlatformUtils.isMobile) {
       Future.microtask(() {
@@ -380,6 +391,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     _doubleTapGestureRecognizer.dispose();
     _scaleGestureRecognizer.dispose();
     _brightnessListener?.cancel();
+    _dataStatusListener?.cancel();
     _controlsListener?.cancel();
     _animationController.dispose();
     _transformationController.dispose();
@@ -1345,6 +1357,8 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
 
   @override
   Widget build(BuildContext context) {
+    final videoController = this.videoController;
+    if (videoController == null) return const SizedBox.shrink();
     maxWidth = widget.maxWidth;
     maxHeight = widget.maxHeight;
     final isFullScreen = this.isFullScreen;
@@ -1869,7 +1883,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                           ),
                           onLongPress:
                               (Platform.isAndroid || kDebugMode) && !isLive
-                              ? _screenshotWebp
+                              ? screenshotWebp
                               : null,
                           onTap: plPlayerController.takeScreenshot,
                         ),
@@ -2053,7 +2067,7 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
                     fit: videoFit.boxFit,
                     alignment: widget.alignment,
                     child: SimpleVideo(
-                      controller: plPlayerController.videoController!,
+                      controller: videoController!,
                       fill: widget.fill,
                       aspectRatio: videoFit.aspectRatio,
                     ),
@@ -2067,14 +2081,14 @@ class _PLVideoPlayerState extends State<PLVideoPlayer>
     );
   }
 
-  Future<void> _screenshotWebp() async {
+  Future<void> screenshotWebp() async {
     final videoInfo = videoDetailController.data;
     final ids = videoInfo.dash!.video!.availableVideoQualities;
     final video = videoDetailController.findVideoByQa(ids.min);
 
+    VideoQuality qa = video.quality;
     String? url = video.baseUrl;
     if (url == null) return;
-    VideoQuality qa = video.quality;
 
     final ctr = plPlayerController;
     final theme = Theme.of(context);

@@ -52,6 +52,84 @@ just build appbundle --release
 
 The first argument to `build` selects the Flutter build target and defaults to `apk`; remaining arguments are passed to Flutter. Recipes intentionally do not encode platform-specific flags.
 
+## macOS CI build and DMG download
+
+Use `.github/workflows/mac.yml` for a macOS-only build. It runs on `macos-26`, executes `flutter build macos --release --dart-define-from-file=pili_release.json --no-pub`, creates a DMG, and uploads the raw DMG with `actions/upload-artifact@v7` and `archive: false`.
+
+### Build and wait
+
+Run the workflow against the remote branch containing the changes. The remote must be the repository passed to `gh workflow run`; do not dispatch a build for a different repository or ref.
+
+```sh
+gh auth status
+
+REPO=proItheus/PiliPlus
+REMOTE=fork # remote that points to $REPO
+BRANCH="$(git branch --show-current)"
+
+git status --short
+git push "$REMOTE" "$BRANCH"
+
+RUN_URL="$(gh workflow run mac.yml --repo "$REPO" --ref "$BRANCH")"
+RUN_ID="${RUN_URL##*/}"
+printf 'Run: %s\n' "$RUN_URL"
+
+gh run watch "$RUN_ID" --repo "$REPO" --exit-status
+```
+
+If the remote branch has diverged, never replace it silently. Only when the user has explicitly authorized replacement, use `git push --force-with-lease "$REMOTE" "$BRANCH"`; otherwise reconcile the branch first. If the run fails, inspect the failed steps before retrying:
+
+```sh
+gh run view "$RUN_ID" --repo "$REPO" --log-failed
+```
+
+Dispatch `mac.yml` directly for a macOS-only artifact. The top-level `build.yml` workflow is a multi-platform wrapper and should be used only when those additional builds are intentional.
+
+### Find and download the artifact
+
+After a successful run, list the artifact ID, filename, size, and digest:
+
+```sh
+gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+  --jq '.artifacts[] | [.id, .name, .size_in_bytes, .digest] | @tsv'
+```
+
+Set `ARTIFACT_ID` and `ARTIFACT_NAME` from the DMG row, then download the raw file into `$TMPDIR`:
+
+```sh
+: "${TMPDIR:?TMPDIR must be set}"
+ARTIFACT_ID=<artifact-id-from-listing>
+ARTIFACT_NAME=<artifact-name-from-listing>
+OUT_DIR="$TMPDIR/PiliPlus-macos-$RUN_ID"
+DMG="$OUT_DIR/$ARTIFACT_NAME"
+mkdir -p "$OUT_DIR"
+
+# Do not add --silent: it suppresses the binary response body.
+gh api "repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip" > "$DMG"
+```
+
+Although the endpoint ends in `/zip`, this workflow's `archive: false` setting makes the response the raw DMG. `gh run download` expects a ZIP archive and cannot extract this artifact, so use the API command above instead. Do not commit the downloaded file.
+
+Verify the downloaded file against the metadata before using it:
+
+```sh
+stat -f '%N %z bytes' "$DMG"
+file "$DMG"
+EXPECTED_SHA256="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+  --jq ".artifacts[] | select(.id == $ARTIFACT_ID) | .digest" \
+  | sed 's/^sha256://')"
+ACTUAL_SHA256="$(shasum -a 256 "$DMG" | awk '{print $1}')"
+test "$ACTUAL_SHA256" = "$EXPECTED_SHA256"
+printf 'Verified SHA-256: %s\n' "$ACTUAL_SHA256"
+```
+
+Copy the verified DMG to the user's Downloads directory only after validation:
+
+```sh
+mkdir -p "$HOME/Downloads"
+cp "$DMG" "$HOME/Downloads/$ARTIFACT_NAME"
+```
+
 ## Agent contract
 
 ### 1. Scope / trigger
