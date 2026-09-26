@@ -28,7 +28,7 @@ class _SubPageState extends State<SubPage> with GridMixin {
         actions: [
           IconButton(
             tooltip: '本地订阅',
-            onPressed: () => Get.toNamed('/localSubscription'),
+            onPressed: () => Get.toNamed('/localSubscriptionFeed'),
             icon: const Icon(Icons.bookmark_border),
           ),
         ],

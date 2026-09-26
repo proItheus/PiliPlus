@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Review the feed against the frontend pre-development and quality checklist."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Check reactive state, duplicate-request guards, pagination, and controller lifecycle."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Check observable loading/error behavior, safe-area/UI conventions, and focused tests."}
+{"file": ".trellis/spec/guides/development-workflow.md", "reason": "Use the repository Nix/direnv, FVM, and Just validation contract."}

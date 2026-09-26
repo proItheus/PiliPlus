@@ -30,6 +30,7 @@ import 'package:PiliPlus/pages/live_dm_block/view.dart';
 import 'package:PiliPlus/pages/live_room/view.dart';
 import 'package:PiliPlus/pages/local_history/view.dart';
 import 'package:PiliPlus/pages/local_subscription/view.dart';
+import 'package:PiliPlus/pages/local_subscription_feed/view.dart';
 import 'package:PiliPlus/pages/login/view.dart';
 import 'package:PiliPlus/pages/main/view.dart';
 import 'package:PiliPlus/pages/main_reply/view.dart';
@@ -99,6 +100,10 @@ class Routes {
     GetPage(
       name: '/localSubscription',
       page: () => const LocalSubscriptionPage(),
+    ),
+    GetPage(
+      name: '/localSubscriptionFeed',
+      page: () => const LocalSubscriptionFeedPage(),
     ),
     // 搜索页面
     GetPage(name: '/search', page: () => const SearchPage()),

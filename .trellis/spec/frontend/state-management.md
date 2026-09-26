@@ -33,6 +33,23 @@ Use `Obx` around the smallest state-dependent subtree. `ArticleListPage.build` o
 
 Register controllers through GetX at the page/route boundary (`Get.put`, with a parameter tag when required). Reuse the common lifecycle and pagination behavior rather than reimplementing request guards in every feature.
 
+## Multi-source paginated feeds
+
+When a screen merges independent paginated timelines, keep source cursors and merge buffers in the controller rather than the view:
+
+- Deduplicate persisted source IDs in deterministic saved-list order before issuing requests.
+- Keep one offset, `hasMore`, buffer, and failure marker per source; advance an offset only after a successful page, and stop when the API returns a terminal or unchanged offset.
+- Keep emitted non-null item IDs in controller state across load-more calls; clear cursors, buffers, failures, and emitted IDs on refresh so the current persisted source list is re-read.
+- Return a typed aggregate batch containing items, `hasMore`, and failed sources through `LoadingState`.
+
+Partial source failures remain a successful feed batch with a retryable warning when content exists; an all-source failure before any content uses the normal `Error` branch. This keeps the shared request guard and pagination lifecycle while preventing stale pages and duplicate items.
+
+```dart
+return Success(
+  FeedBatch(items: items, hasMore: hasMore, failedSources: failedSources),
+);
+```
+
 ## Avoid and common mistakes
 
 - Do not store network calls or raw API maps directly in a view; expose typed `LoadingState<T>` from a controller.

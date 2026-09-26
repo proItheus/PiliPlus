@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend checklist for the new feed page, route, state flow, and generated-boundary constraints."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "CommonController/CommonListController lifecycle and typed pagination pattern for the feed controller."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Required loading, error, retry, lifecycle, analyzer, and focused-test quality gates."}
