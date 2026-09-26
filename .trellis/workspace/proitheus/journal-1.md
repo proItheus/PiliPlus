@@ -60,3 +60,25 @@ Added a Nix shell exposing just and fvm, direnv integration, FVM-backed Just rec
 ### Status
 
 [OK] **Completed**
+
+
+## Session 3: Combined local subscriptions feed
+<!-- trellis-session: v=2 fp=d2e7ad9eadf0a660 -->
+
+**Date**: 2026-09-26
+**Task**: Combined local subscriptions feed
+**Branch**: `local-subs`
+
+### Summary
+
+Implemented and verified a combined chronological feed for local subscriptions with cursor-aware multi-source aggregation, partial failure states, route wiring, focused tests, and frontend state-management spec coverage. Targeted analysis passed; focused tests and macOS smoke were blocked by the host's missing Xcode/macOS SDK.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ee398369a` | feat: add combined local subscriptions feed |
+
+### Status
+
+[OK] **Completed**
