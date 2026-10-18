@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Hived persistence, serialized queue, outbox ordering, and isolated storage tests."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Async storage, resource ownership, analyzer boundaries, and verification."}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "JSONL append diagnostics and safe error logging."}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "Lifecycle triggers and controller subscription cleanup."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "GetX controller refresh and reactive state ownership."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Event, projection, controller, and shared-folder boundaries."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Canonical identity and reducer ownership reuse."}

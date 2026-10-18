@@ -1,0 +1,8 @@
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Verify Hive persistence, queue ordering, outbox, and isolated tests."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify async/resource/analyzer quality gates."}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "Verify logging and JSONL failure diagnostics."}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "Verify lifecycle and subscription cleanup."}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "Verify controller refresh and reactive state boundaries."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Verify UI/resource quality and observable behavior."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Verify cross-layer data and event contracts."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Verify no duplicate identity/decoder/reducer logic."}
