@@ -1,6 +1,13 @@
 // ignore_for_file: constant_identifier_names
 
+abstract final class LocalHistoryBoxKey {
+  static const String cacheList = 'cacheList';
+  static const String syncOutbox = 'syncOutbox';
+  static const String syncMetadata = 'syncMetadata';
+}
+
 abstract final class SettingBoxKey {
+  static const String localHistorySyncDirectory = 'localHistorySyncDirectory';
   static const String btmProgressBehavior = 'btmProgressBehavior',
       defaultVideoQa = 'defaultVideoQa',
       defaultVideoQaCellular = 'defaultVideoQaCellular',

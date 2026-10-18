@@ -1047,4 +1047,10 @@ abstract final class Pref {
 
   static bool get enableEmoteTooltip =>
       _setting.get(SettingBoxKey.enableEmoteTooltip, defaultValue: false);
+
+  static String get localHistorySyncDirectory =>
+      _setting.get(SettingBoxKey.localHistorySyncDirectory, defaultValue: '');
+
+  static set localHistorySyncDirectory(String value) =>
+      _setting.put(SettingBoxKey.localHistorySyncDirectory, value);
 }

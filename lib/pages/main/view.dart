@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'dart:io';
 
 import 'package:PiliPlus/common/assets.dart';
@@ -17,11 +19,14 @@ import 'package:PiliPlus/utils/app_scheme.dart';
 import 'package:PiliPlus/utils/extension/context_ext.dart';
 import 'package:PiliPlus/utils/extension/size_ext.dart';
 import 'package:PiliPlus/utils/extension/theme_ext.dart';
+import 'package:PiliPlus/utils/local_history.dart';
+import 'package:PiliPlus/utils/local_history_sync.dart';
 import 'package:PiliPlus/utils/mobile_observer.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
 import 'package:PiliPlus/utils/storage.dart';
 import 'package:PiliPlus/utils/storage_key.dart';
 import 'package:flutter/services.dart';
+
 import 'package:get/get.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:tray_manager/tray_manager.dart';
@@ -98,6 +103,7 @@ class _MainAppState extends PopScopeState<MainApp>
       ..checkUnreadDynamic()
       ..checkDefaultSearch(true)
       ..checkUnread(_mainController.useBottomNav);
+    unawaited(LocalHistory.sync());
     super.didPopNext();
   }
 
@@ -114,6 +120,7 @@ class _MainAppState extends PopScopeState<MainApp>
         ..checkUnreadDynamic()
         ..checkDefaultSearch(true)
         ..checkUnread(_mainController.useBottomNav);
+      unawaited(LocalHistory.sync());
     }
   }
 
@@ -128,7 +135,11 @@ class _MainAppState extends PopScopeState<MainApp>
     }
     removeObserverMobile(this);
     PiliScheme.listener?.cancel();
-    GStorage.close();
+    unawaited(
+      LocalHistory.flush()
+          .then((_) => LocalHistorySync.close())
+          .then((_) => GStorage.close()),
+    );
     super.dispose();
   }
 
@@ -181,6 +192,8 @@ class _MainAppState extends PopScopeState<MainApp>
   }
 
   Future<void> _onClose() async {
+    await LocalHistory.flush();
+    await LocalHistorySync.close();
     await GStorage.compact();
     await GStorage.close();
     await trayManager.destroy();

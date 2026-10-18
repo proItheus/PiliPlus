@@ -10,6 +10,8 @@ import 'package:PiliPlus/pages/local_history/controller.dart';
 import 'package:PiliPlus/pages/setting/widgets/select_dialog.dart';
 import 'package:PiliPlus/utils/grid.dart';
 import 'package:PiliPlus/utils/local_history.dart';
+import 'package:PiliPlus/utils/local_history_sync.dart';
+import 'package:PiliPlus/utils/storage_pref.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart' show Clipboard;
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -114,6 +116,15 @@ class _LocalHistoryPageState extends State<LocalHistoryPage> with GridMixin {
             onTap: _importFromClipboard,
             child: const Text('从剪贴板导入'),
           ),
+          if (LocalHistorySync.supported)
+            PopupMenuItem(
+              onTap: _configureSync,
+              child: Text(
+                Pref.localHistorySyncDirectory.isEmpty
+                    ? '启用自动同步'
+                    : '自动同步：${Pref.localHistorySyncDirectory}',
+              ),
+            ),
           PopupMenuItem(
             onTap: _clearAll,
             child: const Text('清空本地历史'),
@@ -174,7 +185,7 @@ class _LocalHistoryPageState extends State<LocalHistoryPage> with GridMixin {
     }
     final merge = await showDialog<bool>(
       context: context,
-      builder: (context) => SelectDialog<bool>(
+      builder: (context) => const SelectDialog<bool>(
         title: '导入方式',
         value: true, // 默认合并
         values: [
@@ -185,13 +196,49 @@ class _LocalHistoryPageState extends State<LocalHistoryPage> with GridMixin {
     );
     if (merge == null) return;
     final count = await LocalHistory.import(items, merge: merge);
-    _controller.refreshList();
+    await _controller.refreshAndWait();
     SmartDialog.showToast('导入成功，共 $count 条');
+  }
+
+  Future<void> _configureSync() async {
+    final current = Pref.localHistorySyncDirectory;
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('本地历史自动同步'),
+        content: Text(current.isEmpty ? '选择共享文件夹' : '当前文件夹：$current'),
+        actions: [
+          if (current.isNotEmpty)
+            TextButton(
+              onPressed: () => Get.back(result: ''),
+              child: const Text('禁用'),
+            ),
+          TextButton(
+            onPressed: () => Get.back(result: 'select'),
+            child: const Text('选择文件夹'),
+          ),
+          TextButton(onPressed: Get.back, child: const Text('取消')),
+        ],
+      ),
+    );
+    if (choice == null) return;
+    try {
+      final root = choice.isEmpty
+          ? ''
+          : await FilePicker.getDirectoryPath(
+              initialDirectory: current.isEmpty ? null : current,
+            );
+      if (root == null) return;
+      await LocalHistorySync.configure(root);
+      await _controller.refreshAndWait();
+    } catch (error) {
+      SmartDialog.showToast('同步配置失败：$error');
+    }
   }
 
   Future<void> _deleteItem(HistoryItemModel item) async {
     await LocalHistory.remove(item);
-    _controller.refreshList();
+    await _controller.refreshAndWait();
     SmartDialog.showToast('已删除');
   }
 
@@ -215,7 +262,7 @@ class _LocalHistoryPageState extends State<LocalHistoryPage> with GridMixin {
             onPressed: () async {
               Get.back();
               await LocalHistory.clear();
-              _controller.refreshList();
+              await _controller.refreshAndWait();
               SmartDialog.showToast('已清空');
             },
             child: const Text('确定'),

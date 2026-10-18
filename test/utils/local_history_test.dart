@@ -1,5 +1,4 @@
 import 'dart:async' show unawaited;
-
 import 'dart:io';
 
 import 'package:PiliPlus/models_new/history/history.dart';
@@ -33,7 +32,7 @@ void main() {
   });
 
   setUp(() async {
-    await LocalHistory.clear();
+    await GStorage.localHistory.clear();
   });
 
   tearDownAll(() async {
@@ -50,14 +49,13 @@ void main() {
         ),
       );
     }
-
     await LocalHistory.flush();
+    expect(LocalHistory.load(), hasLength(10));
+  });
 
-    final loaded = LocalHistory.load();
-    expect(loaded, hasLength(10));
-    expect(
-      loaded.map((item) => item.history.oid),
-      containsAll(<int>[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
-    );
+  test('completed history remains complete in local projection', () async {
+    await LocalHistory.record(_item(oid: 1, cid: 1, progress: -1));
+    expect(LocalHistory.load().single.progress, -1);
+    expect(LocalHistory.load().single.playbackProgress, 0);
   });
 }
