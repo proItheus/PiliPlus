@@ -3,6 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:PiliPlus/models_new/history/list.dart';
+import 'package:PiliPlus/http/loading_state.dart';
+import 'package:PiliPlus/http/search.dart';
+import 'package:PiliPlus/http/video.dart';
+import 'package:PiliPlus/models_new/history/history.dart';
+import 'package:PiliPlus/models_new/pgc/pgc_info_model/episode.dart';
+import 'package:PiliPlus/models_new/video/video_detail/page.dart';
 import 'package:PiliPlus/services/logger.dart';
 import 'package:PiliPlus/utils/hybrid_logical_clock.dart';
 import 'package:PiliPlus/utils/platform_utils.dart';
@@ -41,20 +47,32 @@ final class LocalHistorySyncEvent {
   final String? key;
   final HistoryItemModel? item;
 
-  Map<String, dynamic> toJson() => {
-    'version': 2,
-    'event_id': eventId,
-    'node_id': nodeId,
-    'hlc': hlc.toJson(),
-    'op': op.name,
-    if (key != null) 'key': key,
-    if (item != null) 'item': item!.toJson(),
-  };
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{
+      'version': 3,
+      'event_id': eventId,
+      'node_id': nodeId,
+      'hlc': hlc.toJson(),
+      'op': op.name,
+      if (key != null) 'key': key,
+    };
+    if (op == LocalHistorySyncOperation.upsert) {
+      json.addAll({
+        'history': item!.history.toJson(),
+        'view_at': item!.viewAt,
+        'progress': item!.progress,
+        'duration': item!.duration,
+      });
+    }
+    return json;
+  }
 
   static LocalHistorySyncEvent? decode(Object? value) {
     try {
       final json = _stringMap(value);
-      if (json == null || json['version'] is! int || json['version'] != 2) {
+      if (json == null) return null;
+      final version = json['version'];
+      if (version is! int || (version != 2 && version != 3)) {
         return null;
       }
       final op = LocalHistorySyncOperation.values.byName(json['op'] as String);
@@ -68,13 +86,39 @@ final class LocalHistorySyncEvent {
       final hlc = HlcTimestamp.fromJson(hlcRaw);
       final key = json['key'];
       final rawItem = json['item'];
+      final rawHistory = json['history'];
       switch (op) {
         case LocalHistorySyncOperation.upsert:
-          final itemJson = _stringMap(rawItem);
-          if (json.length != 7 || key is! String || itemJson == null) {
+          if (version == 2) {
+            final itemJson = _stringMap(rawItem);
+            if (json.length != 7 || key is! String || itemJson == null) {
+              return null;
+            }
+            final item = HistoryItemModel.fromJson(itemJson);
+            if (!LocalHistorySync.isValid(item) ||
+                !LocalHistorySync._isCanonicalKey(key) ||
+                key != LocalHistorySync.keyOf(item)) {
+              return null;
+            }
+            return LocalHistorySyncEvent(
+              eventId: id,
+              nodeId: node,
+              hlc: hlc,
+              op: op,
+              key: key,
+              item: item,
+            );
+          }
+          final historyJson = _stringMap(rawHistory);
+          if (json.length != 10 || key is! String || historyJson == null) {
             return null;
           }
-          final item = HistoryItemModel.fromJson(itemJson);
+          final item = HistoryItemModel(
+            history: History.fromJson(historyJson),
+            viewAt: json['view_at'] as int?,
+            progress: json['progress'] as int?,
+            duration: json['duration'] as int?,
+          );
           if (!LocalHistorySync.isValid(item) ||
               !LocalHistorySync._isCanonicalKey(key) ||
               key != LocalHistorySync.keyOf(item)) {
@@ -102,7 +146,12 @@ final class LocalHistorySyncEvent {
             key: key,
           );
         case LocalHistorySyncOperation.clear:
-          if (json.length != 5 || key != null || rawItem != null) return null;
+          if (json.length != 5 ||
+              key != null ||
+              rawItem != null ||
+              rawHistory != null) {
+            return null;
+          }
           return LocalHistorySyncEvent(
             eventId: id,
             nodeId: node,
@@ -120,6 +169,8 @@ final class LocalHistorySyncEvent {
 abstract final class LocalHistorySync {
   static const String _outboxKey = LocalHistoryBoxKey.syncOutbox;
   static const String _metadataKey = LocalHistoryBoxKey.syncMetadata;
+  static const int _publishIntervalMs = 10 * 60 * 1000;
+  static const int _retryIntervalMs = 10 * 60 * 1000;
   static final StreamController<void> _changes =
       StreamController<void>.broadcast();
   static Stream<void> get changes => _changes.stream;
@@ -133,6 +184,7 @@ abstract final class LocalHistorySync {
   static String _writerId = const Uuid().v4();
   static late HybridLogicalClock _clock;
   static bool _initialized = false;
+  static bool debugSuppressHydrate = false;
   static bool get supported =>
       !kIsWeb && (PlatformUtils.isDesktop || Platform.isAndroid);
 
@@ -140,9 +192,7 @@ abstract final class LocalHistorySync {
       '${item.history.business ?? 'archive'}|${item.history.oid}|${item.history.cid ?? ''}';
 
   static bool isValid(HistoryItemModel item) =>
-      item.title?.isNotEmpty == true &&
-      item.history.oid != null &&
-      item.viewAt != null;
+      item.history.oid != null && item.viewAt != null;
 
   static bool _isCanonicalKey(String key) {
     final parts = key.split('|');
@@ -315,12 +365,15 @@ abstract final class LocalHistorySync {
     path.join(root, 'PiliPlus', 'local-history-sync'),
   );
 
-  static Future<void> publishUpsert(HistoryItemModel item) {
+  static Future<void> publishUpsert(
+    HistoryItemModel item, {
+    bool force = false,
+  }) {
     final key = keyOf(item);
     if (!isValid(item) || !_isCanonicalKey(key)) {
       return Future<void>.value();
     }
-    return _publish(LocalHistorySyncOperation.upsert, key, item);
+    return _publish(LocalHistorySyncOperation.upsert, key, item, force: force);
   }
 
   static Future<void> publishDelete(String key) {
@@ -337,14 +390,20 @@ abstract final class LocalHistorySync {
   static Future<void> _publish(
     LocalHistorySyncOperation op,
     String? key,
-    HistoryItemModel? item,
-  ) => _serialized(() async {
+    HistoryItemModel? item, {
+    bool force = false,
+  }) => _serialized(() async {
     if (!supported || !_initialized) {
       return;
     }
     final root = Pref.localHistorySyncDirectory;
     if (root.isEmpty) {
       return;
+    }
+    final last = _lastPublishMap();
+    if (!force && op == LocalHistorySyncOperation.upsert) {
+      final due = item?.progress == -1 || _isDue(key!, last);
+      if (!due) return;
     }
     final ts = _clock.tick(DateTime.now().millisecondsSinceEpoch);
     await _saveClock();
@@ -359,7 +418,30 @@ abstract final class LocalHistorySync {
     final outbox = _readOutbox()..add(event.toJson());
     await GStorage.localHistory.put(_outboxKey, outbox);
     await _drain(root);
+    if (op == LocalHistorySyncOperation.upsert) {
+      last[key!] = DateTime.now().millisecondsSinceEpoch;
+      await _saveLastPublish(last);
+    }
   });
+
+  static Map<String, int> _lastPublishMap() {
+    final raw = _metadataMap()['lastPublish'];
+    if (raw is! Map) return <String, int>{};
+    final out = <String, int>{};
+    raw.forEach((k, v) {
+      if (k is String && v is int) out[k] = v;
+    });
+    return out;
+  }
+
+  static Future<void> _saveLastPublish(Map<String, int> last) =>
+      _metadata((meta) => meta['lastPublish'] = last);
+
+  static bool _isDue(String key, Map<String, int> last) {
+    final t = last[key];
+    if (t == null) return true;
+    return DateTime.now().millisecondsSinceEpoch - t >= _publishIntervalMs;
+  }
 
   static Future<void> sync() => _serialized(() async {
     if (!supported || !_initialized) return;
@@ -440,10 +522,14 @@ abstract final class LocalHistorySync {
       }
     }
     final visible = <HistoryItemModel>[];
+    final hydrateQueue = <HistoryItemModel>[];
     for (final event in latest.values) {
       if (event.op == LocalHistorySyncOperation.upsert &&
           (clear == null || _compare(event, clear) > 0)) {
-        visible.add(event.item!);
+        final item = event.item!;
+        _fillFromCache(item);
+        if (!_hasDisplayMeta(item)) hydrateQueue.add(item);
+        visible.add(item);
       }
     }
     visible.sort((a, b) {
@@ -458,7 +544,160 @@ abstract final class LocalHistorySync {
       }).toList(),
     );
     _changes.add(null);
+    if (!debugSuppressHydrate && hydrateQueue.isNotEmpty) {
+      unawaited(_hydrate(hydrateQueue));
+    }
   });
+
+  static Map<String, dynamic>? _metaGet(String key) {
+    final all = _stringMap(
+      GStorage.localHistory.get(
+        LocalHistoryBoxKey.videoMeta,
+        defaultValue: <String, dynamic>{},
+      ),
+    );
+    return _stringMap(all?.containsKey(key) == true ? all![key] : null);
+  }
+
+  static Future<void> _metaPut(String key, Map<String, dynamic> meta) async {
+    final all =
+        _stringMap(
+          GStorage.localHistory.get(
+            LocalHistoryBoxKey.videoMeta,
+            defaultValue: <String, dynamic>{},
+          ),
+        ) ??
+        <String, dynamic>{};
+    all[key] = meta;
+    await GStorage.localHistory.put(LocalHistoryBoxKey.videoMeta, all);
+  }
+
+  static void _fillFromCache(HistoryItemModel item) {
+    final meta = _metaGet(keyOf(item));
+    if (meta == null) return;
+    item.title ??= meta['title'] as String?;
+    item.cover ??= meta['cover'] as String?;
+    item.authorName ??= meta['author_name'] as String?;
+    item.authorMid ??= meta['author_mid'] as int?;
+    item.videos ??= meta['videos'] as int?;
+    item.duration ??= meta['duration'] as int?;
+  }
+
+  static bool _hasDisplayMeta(HistoryItemModel item) =>
+      item.title?.isNotEmpty == true;
+
+  static Future<void> _hydrate(List<HistoryItemModel> items) async {
+    const batchSize = 4;
+    for (var start = 0; start < items.length; start += batchSize) {
+      final end = start + batchSize < items.length
+          ? start + batchSize
+          : items.length;
+      await Future.wait([
+        for (var i = start; i < end; i++) _fetchMeta(items[i]),
+      ]);
+    }
+  }
+
+  static Future<void> _fetchMeta(HistoryItemModel item) async {
+    final key = keyOf(item);
+    final existing = _metaGet(key);
+    if (existing?['title'] is String &&
+        (existing!['title'] as String).isNotEmpty) {
+      return;
+    }
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final lastAttempt = existing?['lastAttempt'] as int?;
+    if (lastAttempt != null && now - lastAttempt < _retryIntervalMs) return;
+    Map<String, dynamic>? enrichment;
+    try {
+      if ((item.history.business ?? 'archive') == 'archive' &&
+          item.history.bvid != null) {
+        final res = await VideoHttp.videoIntro(bvid: item.history.bvid!);
+        if (res case Success(:final response)) {
+          final page = _findPage(response.pages, item.history.cid);
+          enrichment = <String, dynamic>{
+            'title': response.title,
+            'cover': response.pic,
+            'author_name': response.owner?.name,
+            'author_mid': response.owner?.mid,
+            'videos': response.videos,
+            'duration': page?.duration ?? response.duration,
+          };
+        }
+      } else if (item.history.business != 'archive' &&
+          item.history.epid != null) {
+        final res = await SearchHttp.pgcInfo(epId: item.history.epid);
+        if (res case Success(:final response)) {
+          final ep = _findEpisode(response.episodes, item.history.cid);
+          enrichment = <String, dynamic>{
+            'title': ep?.title,
+            'cover': ep?.cover,
+            'duration': ep?.duration != null
+                ? (ep!.duration! / 1000).round()
+                : null,
+          };
+        }
+      }
+    } catch (_) {}
+    enrichment ??= <String, dynamic>{};
+    enrichment['lastAttempt'] = now;
+    await _metaPut(key, enrichment);
+    if (enrichment['title'] is String &&
+        (enrichment['title'] as String).isNotEmpty) {
+      item
+        ..title = enrichment['title'] as String
+        ..cover = enrichment['cover'] as String?
+        ..authorName = enrichment['author_name'] as String?
+        ..authorMid = enrichment['author_mid'] as int?
+        ..videos = enrichment['videos'] as int?
+        ..duration = enrichment['duration'] as int?;
+      await _patchProjectionRow(item);
+      _changes.add(null);
+    }
+  }
+
+  static Part? _findPage(List<Part>? pages, int? cid) {
+    if (pages == null || cid == null) return null;
+    for (final p in pages) {
+      if (p.cid == cid) return p;
+    }
+    return null;
+  }
+
+  static EpisodeItem? _findEpisode(List<EpisodeItem>? episodes, int? cid) {
+    if (episodes == null) return null;
+    if (cid != null) {
+      for (final e in episodes) {
+        if (e.cid == cid) return e;
+      }
+    }
+    return episodes.isEmpty ? null : episodes.first;
+  }
+
+  static Future<void> _patchProjectionRow(HistoryItemModel item) async {
+    final raw = GStorage.localHistory.get(LocalHistoryBoxKey.cacheList);
+    if (raw is! List) return;
+    final list = List<dynamic>.from(raw);
+    final key = keyOf(item);
+    for (var i = 0; i < list.length; i++) {
+      final row = list[i];
+      if (row is! Map) continue;
+      try {
+        final existing = HistoryItemModel.fromJson(
+          Map<String, dynamic>.from(row),
+        );
+        if (keyOf(existing) != key) continue;
+      } catch (_) {
+        continue;
+      }
+      final merged = item.toJson();
+      final kid = row['kid'];
+      if (kid != null) merged['kid'] = kid;
+      list[i] = merged;
+      await GStorage.localHistory.put(LocalHistoryBoxKey.cacheList, list);
+      return;
+    }
+  }
 
   static int _compare(LocalHistorySyncEvent a, LocalHistorySyncEvent b) {
     final time = a.hlc.compareTo(b.hlc);
@@ -503,24 +742,62 @@ abstract final class LocalHistorySync {
         continue;
       }
       final writer = File(path.join(directory.path, 'events-$_writerId.jsonl'));
-      var opened = false;
       try {
-        final handle = await writer.open(mode: FileMode.append);
-        opened = true;
-        try {
-          await handle.writeString('${jsonEncode(event.toJson())}\n');
-          await handle.flush();
-        } finally {
-          await handle.close();
-        }
+        await _appendToWriter(writer, event);
       } catch (_) {
-        if (opened) {
-          _writerId = const Uuid().v4();
-        }
+        _writerId = const Uuid().v4();
         rethrow;
       }
       outbox.remove(raw);
       await GStorage.localHistory.put(_outboxKey, outbox);
+    }
+  }
+
+  static Future<void> _appendToWriter(
+    File writer,
+    LocalHistorySyncEvent event,
+  ) async {
+    List<int>? prefix;
+    if (writer.existsSync()) {
+      final bytes = writer.readAsBytesSync();
+      if (bytes.isNotEmpty && bytes.last == 0x0a) {
+        final idx = bytes.lastIndexOf(0x0a, bytes.length - 2);
+        final start = idx + 1;
+        final end = bytes.length - 1;
+        if (end > start) {
+          try {
+            final decoded = LocalHistorySyncEvent.decode(
+              jsonDecode(utf8.decode(bytes.sublist(start, end))),
+            );
+            if (decoded != null &&
+                decoded.op != LocalHistorySyncOperation.clear &&
+                event.op != LocalHistorySyncOperation.clear &&
+                decoded.key != null &&
+                decoded.key == event.key) {
+              prefix = bytes.sublist(0, start);
+            }
+          } catch (_) {}
+        }
+      }
+    }
+    final line = '${jsonEncode(event.toJson())}\n';
+    if (prefix == null) {
+      final handle = await writer.open(mode: FileMode.append);
+      try {
+        await handle.writeString(line);
+        await handle.flush();
+      } finally {
+        await handle.close();
+      }
+    } else {
+      final raf = await writer.open(mode: FileMode.write);
+      try {
+        await raf.writeFrom(prefix);
+        await raf.writeString(line);
+        await raf.flush();
+      } finally {
+        await raf.close();
+      }
     }
   }
 

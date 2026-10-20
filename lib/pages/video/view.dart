@@ -402,13 +402,13 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
         if (!sourceStarted) {
           if (previous != null) {
             previous.viewAt = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-            await LocalHistory.record(previous);
+            await LocalHistory.record(previous, forcePublish: true);
           }
           return;
         }
         if (previous != null) {
           previous.viewAt = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-          await LocalHistory.record(previous);
+          await LocalHistory.record(previous, forcePublish: true);
         }
         _historyPlaying = true;
       }
@@ -424,7 +424,7 @@ class _VideoDetailPageVState extends State<VideoDetailPageV>
       }
       _lastHistoryKey = key;
       _lastHistoryProgress = progress;
-      await LocalHistory.record(item);
+      await LocalHistory.record(item, forcePublish: force);
     } catch (error) {
       if (kDebugMode) debugPrint('record local history: $error');
     }

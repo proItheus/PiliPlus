@@ -53,7 +53,10 @@ abstract final class LocalHistory {
   static String keyOf(HistoryItemModel item) => LocalHistorySync.keyOf(item);
 
   /// Records playback locally and publishes it to the sync outbox.
-  static Future<void> record(HistoryItemModel item) => _serialized(() async {
+  static Future<void> record(
+    HistoryItemModel item, {
+    bool forcePublish = false,
+  }) => _serialized(() async {
     if (!_isValid(item)) return;
     final key = keyOf(item);
     final list = load()
@@ -61,7 +64,9 @@ abstract final class LocalHistory {
       ..add(item)
       ..sort((a, b) => (b.viewAt ?? 0).compareTo(a.viewAt ?? 0));
     await _save(list);
-    await _publish(() => LocalHistorySync.publishUpsert(item));
+    await _publish(
+      () => LocalHistorySync.publishUpsert(item, force: forcePublish),
+    );
   });
 
   /// 导入记录。
@@ -102,7 +107,7 @@ abstract final class LocalHistory {
     await _save(list);
     if (!merge) await _publish(LocalHistorySync.publishClear);
     for (final item in changed) {
-      await _publish(() => LocalHistorySync.publishUpsert(item));
+      await _publish(() => LocalHistorySync.publishUpsert(item, force: true));
     }
     return valid.length;
   });

@@ -4,6 +4,7 @@ abstract final class LocalHistoryBoxKey {
   static const String cacheList = 'cacheList';
   static const String syncOutbox = 'syncOutbox';
   static const String syncMetadata = 'syncMetadata';
+  static const String videoMeta = 'videoMeta';
 }
 
 abstract final class SettingBoxKey {
