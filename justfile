@@ -51,3 +51,23 @@ build target="apk" *args:
 # Remove Flutter build artifacts.
 clean:
     fvm flutter clean
+
+ci_remote := "fork"
+ci_repo := "proItheus/PiliPlus"
+
+# Push the current branch to the fork for CI.
+ci-push:
+    git push {{ ci_remote }} $(git branch --show-current)
+
+# Dispatch the Android build workflow on CI.
+ci-build-android:
+    gh workflow run build.yml --repo {{ ci_repo }} --ref $(git branch --show-current) \
+        -f build_android=true -f build_ios=false -f build_mac=false \
+        -f build_win_x64=false -f build_linux_x64=false
+
+# Dispatch the macOS build workflow on CI.
+ci-build-mac:
+    gh workflow run mac.yml --repo {{ ci_repo }} --ref $(git branch --show-current)
+
+# Push to CI and dispatch both the Android and macOS builds.
+ci-build: ci-push ci-build-android ci-build-mac
