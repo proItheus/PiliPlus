@@ -120,6 +120,7 @@ void main() {
     await LocalHistorySync.close();
     await LocalHistory.flush();
     await GStorage.localHistory.clear();
+    LocalHistorySync.debugSuppressHydrate = true;
     await GStorage.setting.clear();
     sharedRoot = await Directory.systemTemp.createTemp(
       'piliplus-local-history-sync-shared-',
@@ -143,7 +144,7 @@ void main() {
     await hiveDirectory.delete(recursive: true);
   });
 
-  test('round-trips strict version-2 events and dynamic Hive maps', () {
+  test('slim v3 round-trips and legacy v2 events still decode', () {
     final item = _item(oid: 12, cid: 3, viewAt: 100, progress: -1);
     final event = _upsert(
       eventId: 1,
@@ -151,20 +152,38 @@ void main() {
       physicalMs: 1000,
       item: item,
     );
-    final decoded = LocalHistorySyncEvent.decode(event.toJson());
+    final json = event.toJson();
+    expect(json['version'], 3);
+    expect(json.containsKey('title'), isFalse);
+    expect(json.containsKey('item'), isFalse);
+
+    final decoded = LocalHistorySyncEvent.decode(json);
     expect(decoded?.key, 'archive|12|3');
     expect(decoded?.item?.progress, -1);
-    expect(decoded?.hlc, const HlcTimestamp(physicalMs: 1000, logical: 0));
+    expect(decoded?.item?.viewAt, 100);
+    expect(decoded?.item?.history.oid, 12);
+    expect(
+      decoded?.hlc,
+      const HlcTimestamp(physicalMs: 1000, logical: 0),
+    );
 
     final dynamicMap = <dynamic, dynamic>{
-      ...event.toJson(),
-      'hlc': <dynamic, dynamic>{...event.hlc.toJson()},
-      'item': <dynamic, dynamic>{
-        ...event.item!.toJson(),
-        'history': <dynamic, dynamic>{...event.item!.history.toJson()},
-      },
+      ...json,
+      'hlc': <dynamic, dynamic>{...json['hlc'] as Map},
     };
     expect(LocalHistorySyncEvent.decode(dynamicMap)?.key, 'archive|12|3');
+
+    final v2 = <String, dynamic>{
+      'version': 2,
+      'event_id': _uuid(1),
+      'node_id': _uuid(2),
+      'hlc': const HlcTimestamp(physicalMs: 1000, logical: 0).toJson(),
+      'op': 'upsert',
+      'key': 'archive|12|3',
+      'item': item.toJson(),
+    };
+    final v2Decoded = LocalHistorySyncEvent.decode(v2);
+    expect(v2Decoded?.item?.title, 'Video 12');
   });
 
   test('rejects legacy and malformed operation records', () {
@@ -511,5 +530,91 @@ void main() {
         .where((file) => path.basename(file.path).endsWith('.jsonl'))
         .toList();
     expect(eventFiles, hasLength(1));
+  });
+
+  Future<List<String>> readLines() async => [
+    for (final f in await _eventsDirectory(
+      sharedRoot,
+    ).list().where((entry) => entry is File).cast<File>().toList())
+      ...await f.readAsLines(),
+  ];
+
+  test('suppresses same-key republish within the publish interval', () async {
+    await LocalHistory.record(_item(oid: 600, cid: 1, viewAt: 1));
+    await LocalHistory.record(_item(oid: 600, cid: 1, viewAt: 99));
+    final lines = await readLines();
+    expect(lines, hasLength(1));
+    final decoded = LocalHistorySyncEvent.decode(jsonDecode(lines.single));
+    expect(decoded?.item?.viewAt, 1);
+  });
+
+  test('force and completed publishes bypass the sparse gate', () async {
+    await LocalHistory.record(_item(oid: 700, cid: 1, viewAt: 1));
+    await LocalHistory.record(
+      _item(oid: 700, cid: 1, viewAt: 2),
+      forcePublish: true,
+    );
+    await LocalHistory.record(
+      _item(oid: 700, cid: 1, viewAt: 4, progress: -1),
+    );
+    final lines = await readLines();
+    final decoded = LocalHistorySyncEvent.decode(jsonDecode(lines.single));
+    expect(decoded?.item?.progress, -1);
+    expect(decoded?.item?.viewAt, 4);
+  });
+
+  test('truncates consecutive same-key lines on append', () async {
+    await LocalHistory.record(_item(oid: 710, cid: 1, viewAt: 1));
+    await LocalHistory.record(
+      _item(oid: 710, cid: 1, viewAt: 2),
+      forcePublish: true,
+    );
+    await LocalHistory.record(
+      _item(oid: 710, cid: 1, viewAt: 3),
+      forcePublish: true,
+    );
+    final lines = await readLines();
+    expect(lines, hasLength(1));
+    final decoded = LocalHistorySyncEvent.decode(jsonDecode(lines.single));
+    expect(decoded?.item?.viewAt, 3);
+  });
+
+  test(
+    'builds projection from slim v3 events with placeholder display fields',
+    () async {
+      final directory = _eventsDirectory(sharedRoot);
+      final item = _item(oid: 800, cid: 1, viewAt: 10);
+      await _writeEvents(
+        directory,
+        'writer-a',
+        [_upsert(eventId: 80, nodeId: 80, physicalMs: 80, item: item)],
+      );
+      await LocalHistorySync.sync();
+      expect(LocalHistory.load().map(LocalHistory.keyOf), ['archive|800|1']);
+      final row = LocalHistory.load().single;
+      expect(row.progress, 1);
+      expect(row.title, isNull);
+    },
+  );
+
+  test('fills display metadata from the cache during reconciliation', () async {
+    const key = 'archive|800|1';
+    await GStorage.localHistory.put(
+      LocalHistoryBoxKey.videoMeta,
+      {
+        key: {'title': 'Cached Title', 'cover': 'http://cover'},
+      },
+    );
+    final directory = _eventsDirectory(sharedRoot);
+    final item = _item(oid: 800, cid: 1, viewAt: 10);
+    await _writeEvents(
+      directory,
+      'writer-b',
+      [_upsert(eventId: 81, nodeId: 81, physicalMs: 81, item: item)],
+    );
+    await LocalHistorySync.sync();
+    final row = LocalHistory.load().single;
+    expect(row.title, 'Cached Title');
+    expect(row.cover, 'http://cover');
   });
 }
