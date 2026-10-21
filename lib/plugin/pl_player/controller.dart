@@ -71,6 +71,10 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   VideoController? _videoController;
 
   static PlPlayerController? _instance;
+  /// Debug-only probe (built with --dart-define=PILI_DIAG=true) prints mpv
+  /// frame/vo state once per second to capture the freeze-on-resume.
+  static const bool kDiagEnabled =
+      kDebugMode && bool.fromEnvironment('PILI_DIAG');
 
   PlayerStatus playerStatus = .paused;
 
@@ -148,6 +152,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
   late DataSource dataSource;
 
   Timer? _timer;
+  Timer? _diagTimer;
   StreamSubscription? _subForSeek;
 
   Box setting = GStorage.setting;
@@ -905,6 +910,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
           _stopWakeLockTimer();
           _updatePlaybackState();
           WakelockPlus.enable();
+          if (kDiagEnabled) {
+            _startDiagProbe(player);
+          }
 
           if (_isAutoEnterPip) {
             if (_isCurrVideoPage) {
@@ -916,6 +924,9 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
         } else {
           playerStatus = .paused;
           _startWakeLockTimer();
+          if (kDiagEnabled) {
+            _stopDiagProbe();
+          }
           _disableAutoEnterPip();
         }
 
@@ -1148,6 +1159,32 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     if (!isInterrupt) {
       audioSessionHandler?.setActive(false);
     }
+  }
+  /// Debug-only periodic probe of mpv frame/vo state (PILI_DIAG).
+  void _startDiagProbe(NativePlayer player) {
+    _stopDiagProbe();
+    _diagTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      try {
+        final get = player.getProperty;
+        debugPrint(
+          '[diag] t=${player.state.position.inSeconds}s '
+          'frame_count=${get('video-frame-count')} '
+          'vo_cpu=${get('vo-cpu')}% '
+          'display_fps=${get('display-fps')} '
+          'video_fps=${get('video-fps')} '
+          'avsync=${get('avsync')} '
+          'eof=${get('eof')} '
+          'pause=${get('pause')}',
+        );
+      } catch (e) {
+        debugPrint('[diag] probe error: $e');
+      }
+    });
+  }
+
+  void _stopDiagProbe() {
+    _diagTimer?.cancel();
+    _diagTimer = null;
   }
 
   bool tripling = false;
@@ -1584,6 +1621,7 @@ class PlPlayerController with BlockConfigMixin, AudioNormalizationMixin {
     _positionListeners.clear();
     _statusListeners.clear();
     _stopWakeLockTimer();
+    _stopDiagProbe();
     WakelockPlus.disable();
     if (kDebugMode) {
       debugPrint('dispose player');

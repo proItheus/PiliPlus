@@ -8,11 +8,30 @@ on:
         required: false
         default: ""
         type: string
+      build_mode:
+        description: "release or debug"
+        required: false
+        default: release
+        type: string
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "tag"
+        required: false
+        default: ""
+        type: string
+      build_mode:
+        description: "release or debug"
+        required: false
+        default: release
+        type: choice
+        options:
+          - release
+          - debug
 
 jobs:
   build-mac-app:
-    name: Release Mac
+    name: Build Mac
     runs-on: macos-26
     steps:
       - name: Checkout code
@@ -26,6 +45,15 @@ jobs:
           channel: stable
           flutter-version-file: pubspec.yaml
 
+      - name: Resolve build mode
+        id: bm
+        shell: pwsh
+        run: |
+          $mode = "${{ github.event.inputs.build_mode }}"
+          if ("$mode" -eq "") { $mode = "${{ inputs.build_mode }}" }
+          if ("$mode" -eq "") { $mode = "release" }
+          Write-Output "mode=$mode" >> $env:GITHUB_OUTPUT
+
       - name: Set and Extract version
         shell: pwsh
         run: lib/scripts/build.ps1
@@ -34,20 +62,43 @@ jobs:
         shell: pwsh
         run: lib/scripts/patch.ps1 macOS
 
-      - name: Build Mac
+      - name: Build Mac (debug)
+        if: ${{ steps.bm.outputs.mode == 'debug' }}
+        shell: pwsh
+        run: |
+          flutter build macos --debug --dart-define-from-file=pili_release.json --dart-define=PILI_DIAG=true --no-pub
+
+      - name: Build Mac (release)
+        if: ${{ steps.bm.outputs.mode != 'debug' }}
         run: flutter build macos --release --dart-define-from-file=pili_release.json --no-pub
 
+      - name: Package debug app
+        if: ${{ steps.bm.outputs.mode == 'debug' }}
+        shell: pwsh
+        run: |
+          cd build/macos/Build/Products/Debug
+          Compress-Archive -Path PiliPlus.app -DestinationPath PiliPlus_debug_app.zip
+
+      - name: Upload debug app
+        if: ${{ steps.bm.outputs.mode == 'debug' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-debug
+          path: build/macos/Build/Products/Debug/PiliPlus_debug_app.zip
+
       - name: Prepare Upload
+        if: ${{ steps.bm.outputs.mode != 'debug' }}
         run: |
           npm install --global create-dmg
           create-dmg build/macos/Build/Products/Release/PiliPlus.app || true
         continue-on-error: true
 
       - name: Rename DMG
+        if: ${{ steps.bm.outputs.mode != 'debug' }}
         run: mv PiliPlus*.dmg PiliPlus_macos_${{ env.version }}.dmg
 
       - name: Release
-        if: ${{ github.event.inputs.tag != '' }}
+        if: ${{ github.event.inputs.tag != '' && steps.bm.outputs.mode != 'debug' }}
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.inputs.tag }}
@@ -56,6 +107,7 @@ jobs:
             PiliPlus_macos_*.dmg
 
       - name: Upload macos release
+        if: ${{ steps.bm.outputs.mode != 'debug' }}
         uses: actions/upload-artifact@v7
         with:
           archive: false

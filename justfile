@@ -69,5 +69,11 @@ ci-build-android:
 ci-build-mac:
     gh workflow run mac.yml --repo {{ ci_repo }} --ref $(git branch --show-current)
 
+# Dispatch the macOS debug build workflow on CI (PILI_DIAG probe).
+ci-build-mac-debug:
+    git push {{ ci_remote }} $(git branch --show-current)
+    gh workflow run mac.yml --repo {{ ci_repo }} --ref $(git branch --show-current) \
+        -f build_mode=debug
+
 # Push to CI and dispatch both the Android and macOS builds.
 ci-build: ci-push ci-build-android ci-build-mac
