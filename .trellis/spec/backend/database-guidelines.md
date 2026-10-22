@@ -30,6 +30,11 @@ For account persistence, follow the existing account lifecycle and deletion tomb
 
 ## Local playback history queue contract
 
+
+## LocalHistorySync writer identity
+
+`LocalHistorySync` persists a stable per-install `writer_id` in `localHistory['syncMetadata']`, alongside `node_id`, and reuses it for the `events-<writer_id>.jsonl` append file across app sessions. Do not generate a fresh writer id per process; a fresh id would create a new event file on every launch without changing CRDT semantics. On append failure, rotate to a new UUID and persist it so later sessions continue on the rotated file.
+
 ### 1. Scope / Trigger
 
 This contract applies when player callbacks persist local non-file playback history through `LocalHistory` in `lib/utils/local_history.dart`. It prevents concurrent playlist callbacks from losing records and prevents a history reader from observing a queue prefix.

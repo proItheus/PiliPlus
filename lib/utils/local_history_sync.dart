@@ -181,7 +181,7 @@ abstract final class LocalHistorySync {
   static Future<void> Function()? _onExternalChange;
   static Future<void> _externalWork = Future<void>.value();
   static late String _nodeId;
-  static String _writerId = const Uuid().v4();
+  static late String _writerId;
   static late HybridLogicalClock _clock;
   static bool _initialized = false;
   static bool debugSuppressHydrate = false;
@@ -227,6 +227,11 @@ abstract final class LocalHistorySync {
     final rawNodeId = metadata['node_id'];
     final nodeId = rawNodeId is String ? rawNodeId : null;
     _nodeId = nodeId != null && _isUuid(nodeId) ? nodeId : const Uuid().v4();
+    final rawWriterId = metadata['writer_id'];
+    final writerId = rawWriterId is String ? rawWriterId : null;
+    _writerId =
+        writerId != null && _isUuid(writerId) ? writerId : const Uuid().v4();
+    metadata['writer_id'] = _writerId;
     final rawHlc = metadata['hlc'];
     HlcTimestamp? initial;
     if (rawHlc is Map) {
@@ -746,6 +751,7 @@ abstract final class LocalHistorySync {
         await _appendToWriter(writer, event);
       } catch (_) {
         _writerId = const Uuid().v4();
+        await _metadata((meta) => meta['writer_id'] = _writerId);
         rethrow;
       }
       outbox.remove(raw);

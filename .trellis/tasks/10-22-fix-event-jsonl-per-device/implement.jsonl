@@ -1,0 +1,2 @@
+{"file": ".trellis/tasks/archive/2026-10/10-18-local-history-crdt-sync/design.md", "reason": "Defines the node_id/writer_id model, syncMetadata keys, write/drain lifecycle, and append-failure rotation contract this change must preserve."}
+{"file": ".trellis/tasks/archive/2026-10/10-20-optimize-history-jsonl/design.md", "reason": "Defines writer-file naming, same-key truncation, and append semantics that must remain intact when writer id becomes persistent."}

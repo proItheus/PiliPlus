@@ -1,0 +1,2 @@
+{"file": ".trellis/tasks/archive/2026-10/10-18-local-history-crdt-sync/design.md", "reason": "Verification baseline for event schema, outbox durability, multi-writer reconciliation, and failure-rotation behavior."}
+{"file": ".trellis/tasks/archive/2026-10/10-20-optimize-history-jsonl/design.md", "reason": "Verification baseline for writer-file naming, tail truncation, and append semantics."}

@@ -617,4 +617,98 @@ void main() {
     expect(row.title, 'Cached Title');
     expect(row.cover, 'http://cover');
   });
+
+  test('persists writer id across sessions so publishes reuse the same event file', () async {
+    await LocalHistorySync.initialize(LocalHistory.sync);
+    await LocalHistorySync.configure(sharedRoot.path);
+    await LocalHistorySync.publishUpsert(
+      _item(oid: 900, cid: 9, viewAt: 100),
+      force: true,
+    );
+    final directory = _eventsDirectory(sharedRoot);
+    Future<String> writerFileName() async {
+      final files = await directory
+          .list(followLinks: false)
+          .where(
+            (entry) =>
+                entry is File &&
+                path.basename(entry.path).startsWith('events-') &&
+                entry.path.endsWith('.jsonl'),
+          )
+          .cast<File>()
+          .toList();
+      expect(files, hasLength(1));
+      return path.basename(files.single.path);
+    }
+
+    final first = await writerFileName();
+    await LocalHistorySync.close();
+    await LocalHistorySync.initialize(LocalHistory.sync);
+    await LocalHistorySync.configure(sharedRoot.path);
+    await LocalHistorySync.publishUpsert(
+      _item(oid: 901, cid: 9, viewAt: 200),
+      force: true,
+    );
+    expect(await writerFileName(), first);
+  });
+
+  test('rotation on append failure persists the fresh writer id', () async {
+    await LocalHistorySync.initialize(LocalHistory.sync);
+    await LocalHistorySync.configure(sharedRoot.path);
+    await LocalHistorySync.publishUpsert(
+      _item(oid: 910, cid: 9, viewAt: 100),
+      force: true,
+    );
+    final directory = _eventsDirectory(sharedRoot);
+    final files = await directory
+        .list(followLinks: false)
+        .where(
+          (entry) =>
+              entry is File &&
+              path.basename(entry.path).startsWith('events-') &&
+              entry.path.endsWith('.jsonl'),
+        )
+        .cast<File>()
+        .toList();
+    expect(files, hasLength(1));
+    final writerName = path.basename(files.single.path);
+
+    // Sabotage the current writer path so appending fails.
+    await files.single.delete();
+    await Directory(path.join(directory.path, writerName)).create();
+
+    Map<String, dynamic> metadata() => Map<String, dynamic>.from(
+          GStorage.localHistory.get(LocalHistoryBoxKey.syncMetadata) as Map,
+        );
+    final writerIdBefore = metadata()['writer_id'];
+
+    await expectLater(
+      LocalHistorySync.publishUpsert(
+        _item(oid: 911, cid: 9, viewAt: 200),
+        force: true,
+      ),
+      throwsA(isA<Object>()),
+    );
+    final writerIdAfter = metadata()['writer_id'];
+    expect(writerIdAfter, isNot(writerIdBefore));
+
+    await Directory(path.join(directory.path, writerName)).delete();
+    await LocalHistorySync.publishUpsert(
+      _item(oid: 912, cid: 9, viewAt: 300),
+      force: true,
+    );
+    expect(GStorage.localHistory.get(LocalHistoryBoxKey.syncOutbox), isEmpty);
+    final after = await directory
+        .list(followLinks: false)
+        .where(
+          (entry) =>
+              entry is File &&
+              path.basename(entry.path).startsWith('events-') &&
+              entry.path.endsWith('.jsonl'),
+        )
+        .cast<File>()
+        .toList();
+    expect(after, hasLength(1));
+    expect(path.basename(after.single.path), isNot(writerName));
+  });
 }
